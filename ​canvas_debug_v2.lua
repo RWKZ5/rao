@@ -1,5 +1,5 @@
 -- ============================================
--- [ VVOV Canvas Drawer v7.0 - Debug Edition ]
+-- [ VVOV Canvas Drawer v7.0 - Debug Edition V2 ]
 -- ============================================
 
 local HttpService = game:GetService("HttpService")
@@ -43,7 +43,7 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, -40, 0, 36)
-Title.Text = "  🎨 VVOV Mobile Drawer v7.0 (Debug)"
+Title.Text = "  🎨 VVOV Mobile Drawer v7.0 (Debug V2)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 Title.Font = Enum.Font.GothamBold
@@ -245,25 +245,23 @@ AnalyzeBtn.MouseButton1Click:Connect(function()
             local success, response = pcall(function() return game:HttpGet(api) end)
 
             if success and response then
-                print("[DEBUG] API RESPONSE:", response)
-                
+                print("API RESPONSE:", response)
+
                 local decoded = nil
-                local jsonSuccess, jsonErr = pcall(function() decoded = HttpService:JSONDecode(response) end)
-                
-                if jsonSuccess and decoded and type(decoded) == "table" then
-                    -- التحقق من عدم وجود مفتاح خطأ داخلي في الـ JSON
-                    if not decoded.error and not decoded.message then
-                        pixelMatrix = decoded
-                        print("[DEBUG] SUCCESS: Matrix loaded successfully from API", index)
-                        break
-                    else
-                        print("[DEBUG] JSON returned error field:", decoded.error or decoded.message)
-                    end
-                else
-                    print("[DEBUG] JSON Decode Failed:", jsonErr)
+                local ok, err = pcall(function()
+                    decoded = HttpService:JSONDecode(response)
+                end)
+
+                if not ok then
+                    print("JSON ERROR:", err)
+                end
+
+                if decoded and type(decoded) == "table" then
+                    pixelMatrix = decoded
+                    break
                 end
             else
-                print("[DEBUG] HttpGet Failed for API", index, "Error:", response)
+                print("HTTP ERROR:", response)
             end
         end
 
