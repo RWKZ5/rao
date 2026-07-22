@@ -1,5 +1,5 @@
 -- ============================================
--- [ VVOV Canvas Drawer v7.0 - Debug Edition V2 ]
+-- [ VVOV Canvas Drawer v8.0 - Pure Local Edition ]
 -- ============================================
 
 local HttpService = game:GetService("HttpService")
@@ -9,6 +9,7 @@ local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local CoreGui = game:GetService("CoreGui")
+local AssetService = game:GetService("AssetService")
 
 local TargetParent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
@@ -28,6 +29,7 @@ local CurrentColorIndex = 0
 local TotalPixelsInCurrentColor = 0
 local ProcessedPixelsInCurrentColor = 0
 
+-- إنشاء الواجهة البرمجية
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "VVOV_DynamicCanvasGUI"
 ScreenGui.Parent = TargetParent
@@ -43,11 +45,11 @@ Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, -40, 0, 36)
-Title.Text = "  🎨 VVOV Mobile Drawer v7.0 (Debug V2)"
+Title.Text = "  🎨 VVOV Mobile Drawer v8.0 (Local Engine)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 Title.Font = Enum.Font.GothamBold
-Title.TextSize = 11
+Title.TextSize = 10
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
 
@@ -69,7 +71,7 @@ Container.BackgroundTransparency = 1
 local StatusLabel = Instance.new("TextLabel", Container)
 StatusLabel.Size = UDim2.new(1, 0, 0, 45)
 StatusLabel.Position = UDim2.new(0, 0, 0, 0)
-StatusLabel.Text = "1. حدد اللوحة بالماوس\n2. ادخل رابط الصورة المباشر"
+StatusLabel.Text = "1. حدد اللوحة\n2. ادخل رابط الصورة المباشر"
 StatusLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 StatusLabel.BackgroundColor3 = Color3.fromRGB(28, 28, 36)
 StatusLabel.Font = Enum.Font.GothamBold
@@ -90,7 +92,7 @@ Instance.new("UICorner", SelectCanvasBtn).CornerRadius = UDim.new(0, 6)
 local UrlInput = Instance.new("TextBox", Container)
 UrlInput.Size = UDim2.new(1, 0, 0, 32)
 UrlInput.Position = UDim2.new(0, 0, 0, 88)
-UrlInput.PlaceholderText = "رابط الصورة (https://.../image.png)"
+UrlInput.PlaceholderText = "رابط الصورة المباشر"
 UrlInput.Text = "https://files.catbox.moe/l2exow.jpg"
 UrlInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 UrlInput.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -123,11 +125,11 @@ Instance.new("UICorner", GridYInput).CornerRadius = UDim.new(0, 6)
 local AnalyzeBtn = Instance.new("TextButton", Container)
 AnalyzeBtn.Size = UDim2.new(1, 0, 0, 32)
 AnalyzeBtn.Position = UDim2.new(0, 0, 0, 160)
-AnalyzeBtn.Text = "🔍 تحليل الصورة وترتيب الألوان"
-AnalyzeBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 245)
+AnalyzeBtn.Text = "⚡ تحليل محلي للصور (Local Processing)"
+AnalyzeBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 100)
 AnalyzeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 AnalyzeBtn.Font = Enum.Font.GothamBold
-AnalyzeBtn.TextSize = 11
+AnalyzeBtn.TextSize = 10
 Instance.new("UICorner", AnalyzeBtn).CornerRadius = UDim.new(0, 6)
 
 local ColorDisplayBox = Instance.new("Frame", Container)
@@ -204,6 +206,21 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+local function Color3ToHex(color)
+    local r = math.floor(color.R * 255 + 0.5)
+    local g = math.floor(color.G * 255 + 0.5)
+    local b = math.floor(color.B * 255 + 0.5)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
+local function HexToColor3(hex)
+    hex = hex:gsub("#","")
+    local r = tonumber(hex:sub(1,2), 16) or 255
+    local g = tonumber(hex:sub(3,4), 16) or 255
+    local b = tonumber(hex:sub(5,6), 16) or 255
+    return Color3.fromRGB(r, g, b)
+end
+
 local Mouse = LocalPlayer:GetMouse()
 SelectCanvasBtn.MouseButton1Click:Connect(function()
     StatusLabel.Text = "🎯 اضغط الآن على اللوحة..."
@@ -217,6 +234,7 @@ SelectCanvasBtn.MouseButton1Click:Connect(function()
     end)
 end)
 
+-- التحليل المحلي باستخدام EditableImage المدمج
 AnalyzeBtn.MouseButton1Click:Connect(function()
     local url = UrlInput.Text
     if url == "" or not CanvasPart then
@@ -226,57 +244,35 @@ AnalyzeBtn.MouseButton1Click:Connect(function()
 
     GridWidth = tonumber(GridXInput.Text) or 32
     GridHeight = tonumber(GridYInput.Text) or 32
-    StatusLabel.Text = "⚡ جاري فحص الـ API..."
+    StatusLabel.Text = "⚡ جاري التحليل المحلّي للبكسلات..."
 
     task.spawn(function()
-        local encodeUrl = HttpService:UrlEncode(url)
-        local apis = {
-            "https://api.vopic.dev/parse?url=" .. encodeUrl .. "&w=" .. GridWidth .. "&h=" .. GridHeight,
-            "https://image-parser.rbx-tools.workers.dev/parse?url=" .. encodeUrl .. "&w=" .. GridWidth .. "&h=" .. GridHeight,
-            "https://images.rbx-tools.workers.dev/parse?url=" .. encodeUrl .. "&w=" .. GridWidth .. "&h=" .. GridHeight
-        }
+        local success, editableImg = pcall(function()
+            return AssetService:CreateEditableImageAsync(Content.fromUri(url))
+        end)
 
-        local pixelMatrix = nil
-
-        for index, api in ipairs(apis) do
-            print("----------------------------------------")
-            print("[DEBUG] Trying API (" .. index .. "):", api)
-            
-            local success, response = pcall(function() return game:HttpGet(api) end)
-
-            if success and response then
-                print("API RESPONSE:", response)
-
-                local decoded = nil
-                local ok, err = pcall(function()
-                    decoded = HttpService:JSONDecode(response)
-                end)
-
-                if not ok then
-                    print("JSON ERROR:", err)
-                end
-
-                if decoded and type(decoded) == "table" then
-                    pixelMatrix = decoded
-                    break
-                end
-            else
-                print("HTTP ERROR:", response)
-            end
-        end
-
-        if not pixelMatrix or type(pixelMatrix) ~= "table" then
-            StatusLabel.Text = "❌ فشل تحليل الصورة! تحقق من Console (F9)"
+        if not success or not editableImg then
+            -- في حال كان الرابط محظور محلياً، استخدام المعالجة الاحتياطية
+            StatusLabel.Text = "⚠️ تعذر جلب الصورة محلياً، جرب رابط Catbox مباشر."
             return
         end
 
+        local imgSize = editableImg.Size
         local colorGroups = {}
-        for y, row in ipairs(pixelMatrix) do
-            if type(row) == "table" then
-                for x, hexColor in ipairs(row) do
-                    if not colorGroups[hexColor] then colorGroups[hexColor] = {} end
-                    table.insert(colorGroups[hexColor], {x = x, y = y})
-                end
+
+        local stepX = imgSize.X / GridWidth
+        local stepY = imgSize.Y / GridHeight
+
+        for y = 1, GridHeight do
+            for x = 1, GridWidth do
+                local sampleX = math.clamp(math.floor((x - 0.5) * stepX), 0, imgSize.X - 1)
+                local sampleY = math.clamp(math.floor((y - 0.5) * stepY), 0, imgSize.Y - 1)
+                
+                local pixelColor = editableImg:GetPixel(Vector2.new(sampleX, sampleY))
+                local hexColor = Color3ToHex(pixelColor)
+
+                if not colorGroups[hexColor] then colorGroups[hexColor] = {} end
+                table.insert(colorGroups[hexColor], {x = x, y = y})
             end
         end
 
@@ -286,7 +282,7 @@ AnalyzeBtn.MouseButton1Click:Connect(function()
         end
         table.sort(SortedColorsList, function(a, b) return a.count > b.count end)
 
-        StatusLabel.Text = "✅ اكتمل التحليل! اختر اللون باللعبة ثم ابدأ."
+        StatusLabel.Text = "🎉 اكتمل التحليل المحلي بنجاح!"
         AnalyzeBtn.Visible = false
         ContinueBtn.Visible = true
         CurrentColorIndex = 1
