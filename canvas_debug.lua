@@ -1,5 +1,5 @@
 -- ============================================
--- [ VVOV Canvas Drawer v7.0 - Mobile Edition ]
+-- [ VVOV Canvas Drawer v7.0 - Debug Edition ]
 -- ============================================
 
 local HttpService = game:GetService("HttpService")
@@ -10,10 +10,8 @@ local Camera = Workspace.CurrentCamera
 local VirtualInputManager = game:GetService("VirtualInputManager")
 local CoreGui = game:GetService("CoreGui")
 
--- تحديد المجلد الآمن للواجهة على الجوال
 local TargetParent = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
 
--- حذف الواجهة القديمة إن وجدت
 if TargetParent:FindFirstChild("VVOV_DynamicCanvasGUI") then
     TargetParent.VVOV_DynamicCanvasGUI:Destroy()
 end
@@ -30,7 +28,6 @@ local CurrentColorIndex = 0
 local TotalPixelsInCurrentColor = 0
 local ProcessedPixelsInCurrentColor = 0
 
--- 1. بناء واجهة الجوال
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "VVOV_DynamicCanvasGUI"
 ScreenGui.Parent = TargetParent
@@ -44,10 +41,9 @@ MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 10)
 
--- شريط العنوان
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, -40, 0, 36)
-Title.Text = "  🎨 VVOV Mobile Drawer v7.0"
+Title.Text = "  🎨 VVOV Mobile Drawer v7.0 (Debug)"
 Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 Title.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 Title.Font = Enum.Font.GothamBold
@@ -55,7 +51,6 @@ Title.TextSize = 11
 Title.TextXAlignment = Enum.TextXAlignment.Left
 Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 10)
 
--- زر التصغير
 local MinimizeBtn = Instance.new("TextButton", MainFrame)
 MinimizeBtn.Size = UDim2.new(0, 35, 0, 36)
 MinimizeBtn.Position = UDim2.new(1, -38, 0, 0)
@@ -96,7 +91,7 @@ local UrlInput = Instance.new("TextBox", Container)
 UrlInput.Size = UDim2.new(1, 0, 0, 32)
 UrlInput.Position = UDim2.new(0, 0, 0, 88)
 UrlInput.PlaceholderText = "رابط الصورة (https://.../image.png)"
-UrlInput.Text = ""
+UrlInput.Text = "https://files.catbox.moe/l2exow.jpg"
 UrlInput.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 UrlInput.TextColor3 = Color3.fromRGB(255, 255, 255)
 UrlInput.Font = Enum.Font.Gotham
@@ -209,45 +204,6 @@ MinimizeBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local function LockCameraForDrawing()
-    if not CanvasPart then return end
-    local canvasCF = CanvasPart.CFrame
-    local canvasSize = CanvasPart.Size
-    local maxDimension = math.max(canvasSize.X, canvasSize.Y)
-    local targetPosition = canvasCF.Position + (canvasCF.LookVector * (maxDimension * 1.85))
-    Camera.CameraType = Enum.CameraType.Scriptable
-    Camera.CFrame = CFrame.lookAt(targetPosition, canvasCF.Position)
-end
-
-local function UnlockCamera()
-    Camera.CameraType = Enum.CameraType.Custom
-end
-
-local function ClickGridCellRaycast(gridX, gridY)
-    if not CanvasPart then return end
-    local size = CanvasPart.Size
-    local cf = CanvasPart.CFrame
-    local stepX = size.X / GridWidth
-    local stepY = size.Y / GridHeight
-    local topLeft = cf.Position - (cf.RightVector * (size.X / 2)) + (cf.UpVector * (size.Y / 2))
-    local pixelPos3D = topLeft + (cf.RightVector * (stepX * (gridX - 0.5))) - (cf.UpVector * (stepY * (gridY - 0.5))) + (cf.LookVector * 0.05)
-
-    local screenPos, onScreen = Camera:WorldToScreenPoint(pixelPos3D)
-    if onScreen then
-        VirtualInputManager:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, true, game, 0)
-        task.wait(0.001)
-        VirtualInputManager:SendMouseButtonEvent(screenPos.X, screenPos.Y, 0, false, game, 0)
-    end
-end
-
-local function HexToColor3(hex)
-    hex = hex:gsub("#","")
-    local r = tonumber(hex:sub(1,2), 16) or 255
-    local g = tonumber(hex:sub(3,4), 16) or 255
-    local b = tonumber(hex:sub(5,6), 16) or 255
-    return Color3.fromRGB(r, g, b)
-end
-
 local Mouse = LocalPlayer:GetMouse()
 SelectCanvasBtn.MouseButton1Click:Connect(function()
     StatusLabel.Text = "🎯 اضغط الآن على اللوحة..."
@@ -270,27 +226,59 @@ AnalyzeBtn.MouseButton1Click:Connect(function()
 
     GridWidth = tonumber(GridXInput.Text) or 32
     GridHeight = tonumber(GridYInput.Text) or 32
-    StatusLabel.Text = "⚡ جاري تحميل ألوان الصورة..."
+    StatusLabel.Text = "⚡ جاري فحص الـ API..."
 
     task.spawn(function()
-        local parseApi = "https://images.rbx-tools.workers.dev/parse?url=" .. HttpService:UrlEncode(url) .. "&w=" .. GridWidth .. "&h=" .. GridHeight
-        local success, response = pcall(function() return game:HttpGet(parseApi) end)
+        local encodeUrl = HttpService:UrlEncode(url)
+        local apis = {
+            "https://api.vopic.dev/parse?url=" .. encodeUrl .. "&w=" .. GridWidth .. "&h=" .. GridHeight,
+            "https://image-parser.rbx-tools.workers.dev/parse?url=" .. encodeUrl .. "&w=" .. GridWidth .. "&h=" .. GridHeight,
+            "https://images.rbx-tools.workers.dev/parse?url=" .. encodeUrl .. "&w=" .. GridWidth .. "&h=" .. GridHeight
+        }
 
         local pixelMatrix = nil
-        if success and response then
-            pcall(function() pixelMatrix = HttpService:JSONDecode(response) end)
+
+        for index, api in ipairs(apis) do
+            print("----------------------------------------")
+            print("[DEBUG] Trying API (" .. index .. "):", api)
+            
+            local success, response = pcall(function() return game:HttpGet(api) end)
+
+            if success and response then
+                print("[DEBUG] API RESPONSE:", response)
+                
+                local decoded = nil
+                local jsonSuccess, jsonErr = pcall(function() decoded = HttpService:JSONDecode(response) end)
+                
+                if jsonSuccess and decoded and type(decoded) == "table" then
+                    -- التحقق من عدم وجود مفتاح خطأ داخلي في الـ JSON
+                    if not decoded.error and not decoded.message then
+                        pixelMatrix = decoded
+                        print("[DEBUG] SUCCESS: Matrix loaded successfully from API", index)
+                        break
+                    else
+                        print("[DEBUG] JSON returned error field:", decoded.error or decoded.message)
+                    end
+                else
+                    print("[DEBUG] JSON Decode Failed:", jsonErr)
+                end
+            else
+                print("[DEBUG] HttpGet Failed for API", index, "Error:", response)
+            end
         end
 
         if not pixelMatrix or type(pixelMatrix) ~= "table" then
-            StatusLabel.Text = "❌ فشل تحليل الصورة!"
+            StatusLabel.Text = "❌ فشل تحليل الصورة! تحقق من Console (F9)"
             return
         end
 
         local colorGroups = {}
         for y, row in ipairs(pixelMatrix) do
-            for x, hexColor in ipairs(row) do
-                if not colorGroups[hexColor] then colorGroups[hexColor] = {} end
-                table.insert(colorGroups[hexColor], {x = x, y = y})
+            if type(row) == "table" then
+                for x, hexColor in ipairs(row) do
+                    if not colorGroups[hexColor] then colorGroups[hexColor] = {} end
+                    table.insert(colorGroups[hexColor], {x = x, y = y})
+                end
             end
         end
 
@@ -311,55 +299,4 @@ AnalyzeBtn.MouseButton1Click:Connect(function()
         ProgressText.Text = "المتبقي: " .. firstColorData.count .. " / " .. firstColorData.count
         ProgressBarFill.Size = UDim2.new(0, 0, 1, 0)
     end)
-end)
-
-ContinueBtn.MouseButton1Click:Connect(function()
-    if IsDrawing or CurrentColorIndex > #SortedColorsList then return end
-    IsDrawing = true
-    ContinueBtn.Visible = false
-
-    LockCameraForDrawing()
-    task.wait(0.1)
-
-    local colorData = SortedColorsList[CurrentColorIndex]
-    TotalPixelsInCurrentColor = colorData.count
-    ProcessedPixelsInCurrentColor = 0
-
-    StatusLabel.Text = "⚡ جاري رسم " .. colorData.hex .. "..."
-
-    task.spawn(function()
-        for _, pixelPos in ipairs(colorData.pixels) do
-            if not IsDrawing then break end
-            ClickGridCellRaycast(pixelPos.x, pixelPos.y)
-            ProcessedPixelsInCurrentColor = ProcessedPixelsInCurrentColor + 1
-            ProgressText.Text = "المتبقي: " .. (TotalPixelsInCurrentColor - ProcessedPixelsInCurrentColor) .. " / " .. TotalPixelsInCurrentColor
-            ProgressBarFill.Size = UDim2.new(ProcessedPixelsInCurrentColor / TotalPixelsInCurrentColor, 0, 1, 0)
-            task.wait(DrawSpeed)
-        end
-
-        UnlockCamera()
-        IsDrawing = false
-        CurrentColorIndex = CurrentColorIndex + 1
-
-        if CurrentColorIndex <= #SortedColorsList then
-            local nextColor = SortedColorsList[CurrentColorIndex]
-            ColorPreview.BackgroundColor3 = HexToColor3(nextColor.hex)
-            ColorTextLabel.Text = "اللون: " .. nextColor.hex
-            ProgressText.Text = "المتبقي: " .. nextColor.count .. " / " .. nextColor.count
-            ProgressBarFill.Size = UDim2.new(0, 0, 1, 0)
-            StatusLabel.Text = "🎨 اختر اللون (" .. nextColor.hex .. ") ثم اضغط متابعة!"
-            ContinueBtn.Visible = true
-        else
-            StatusLabel.Text = "🎉 اكتمل رسم اللوحة!"
-            AnalyzeBtn.Visible = true
-        end
-    end)
-end)
-
-StopBtn.MouseButton1Click:Connect(function()
-    IsDrawing = false
-    UnlockCamera()
-    ContinueBtn.Visible = false
-    AnalyzeBtn.Visible = true
-    StatusLabel.Text = "تم إيقاف الرسم."
 end)
